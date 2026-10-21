@@ -1,0 +1,57 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "pdf-office-toolkit"
+version = "0.1.0"  # 与 src/pdf_gui/gui/app_meta.json 的 version 保持一致
+description = "PDF 办公百宝箱：离线批量合并/拆分/水印/盖章/骑缝章/加密/压缩/转图片"
+authors = [{ name = "魔都吴所谓" }]
+requires-python = ">=3.10"
+license = { text = "Apache-2.0" }
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: End Users/Desktop",
+    "License :: OSI Approved :: Apache Software License",
+    "Natural Language :: Chinese (Simplified)",
+    "Natural Language :: English",
+    "Operating System :: Microsoft :: Windows",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Office/Business",
+]
+dependencies = [
+    "pypdf[crypto]>=4.0",
+    "reportlab>=4.0",
+    "Pillow>=10.0",
+    "pypdfium2>=4.0",
+    "customtkinter>=5.2",
+]
+
+[project.urls]
+Repository = "https://github.com/moduwusuowei/pdf-office-toolkit"
+Issues = "https://github.com/moduwusuowei/pdf-office-toolkit/issues"
+
+[project.scripts]
+pdf-office-toolkit = "pdf_gui.main:main"
+
+[project.optional-dependencies]
+dev = ["pytest>=8.0", "ruff>=0.4", "pyinstaller>=6.0"]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+"pdf_gui.gui" = ["app_meta.json"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 100
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "W"]

@@ -1,0 +1,11 @@
+# 运行时依赖（与 pyproject.toml [project.dependencies] 保持一致）
+pypdf[crypto]>=4.0
+reportlab>=4.0
+Pillow>=10.0
+pypdfium2>=4.0
+customtkinter>=5.2
+
+# 开发/构建依赖（与 pyproject.toml [project.optional-dependencies].dev 保持一致）
+pytest>=8.0
+ruff>=0.4
+pyinstaller>=6.0

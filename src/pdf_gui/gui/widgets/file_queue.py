@@ -1,4 +1,6 @@
-"""文件队列控件：添加/排序/移除 PDF，逐个校验；加密文件提示输密码并临时解密。"""
+"""文件队列控件：添加/排序/移除文件，逐个校验；PDF 加密时提示输密码并临时解密。
+
+kind="image" 时接受常见图片格式（供图片转 PDF 面板使用），不涉及密码。"""
 
 import tempfile
 import tkinter as tk
@@ -7,20 +9,24 @@ from pathlib import Path
 from tkinter import filedialog
 
 import customtkinter as ctk
+from PIL import Image
 from pypdf import PdfReader
 
-from ...core import decrypt_pdf
+from ...core import SUPPORTED_SUFFIXES, decrypt_pdf
 from ..i18n import t
 
 TEMP_DIR = Path(tempfile.gettempdir()) / "pdf_office_toolkit"
 
+IMAGE_FILE_TYPES = [("图片", " ".join(f"*{s}" for s in sorted(SUPPORTED_SUFFIXES)))]
+
 
 class FileQueue(ctk.CTkFrame):
     def __init__(self, master, *, max_files=0, ask_password, on_change=None,
-                 state=None):
+                 state=None, kind="pdf"):
         super().__init__(master)
         # state 存在时队列随面板重建保留（切换语言/配色不会清空用户添加的文件）
         self._state = state
+        self.kind = kind               # "pdf" 或 "image"
         self.max_files = max_files     # 0 = 不限；1 = 单文件（添加新文件时替换旧的）
         self.items: list[dict] = self._restore()   # [{path, display, ok}]
         self.ask_password = ask_password
@@ -73,14 +79,42 @@ class FileQueue(ctk.CTkFrame):
 
     # ---- 添加 ----
     def _pick_files(self):
-        for p in filedialog.askopenfilenames(filetypes=[("PDF", "*.pdf")]):
+        filetypes = ([("PDF", "*.pdf")] if self.kind == "pdf"
+                     else IMAGE_FILE_TYPES)
+        for p in filedialog.askopenfilenames(filetypes=filetypes):
             self._add(Path(p))
 
     def _pick_folder(self):
         folder = filedialog.askdirectory()
         if folder:
-            for p in sorted(Path(folder).glob("*.pdf")):
+            self._pick_folder_path(Path(folder))
+
+    def add_paths(self, paths) -> int:
+        """外部拖入/批量添加；返回实际加入的数量（目录会展开）。"""
+        added = 0
+        for p in paths:
+            p = Path(p)
+            if p.is_dir():
+                before = len(self.items)
+                self._pick_folder_path(p)
+                added += len(self.items) - before
+                continue
+            if self._accepts(p):
                 self._add(p)
+                added += 1
+        return added
+
+    def _pick_folder_path(self, folder: Path):
+        suffix_ok = (lambda p: p.suffix.lower() == ".pdf") if self.kind == "pdf" \
+            else (lambda p: p.suffix.lower() in SUPPORTED_SUFFIXES)
+        for p in sorted(folder.iterdir()):
+            if p.is_file() and suffix_ok(p):
+                self._add(p)
+
+    def _accepts(self, path: Path) -> bool:
+        if self.kind == "pdf":
+            return path.suffix.lower() == ".pdf"
+        return path.suffix.lower() in SUPPORTED_SUFFIXES
 
     def _add(self, path: Path):
         if self.max_files and len(self.items) >= self.max_files:
@@ -89,6 +123,14 @@ class FileQueue(ctk.CTkFrame):
         self._refresh()
 
     def _validate(self, path: Path) -> dict:
+        if self.kind == "image":
+            try:
+                with Image.open(path) as im:
+                    im.verify()
+                return {"path": path, "display": path.name, "ok": True}
+            except Exception:
+                return {"path": path,
+                        "display": f"{path.name}（{t('bad_image')}）", "ok": False}
         try:
             reader = PdfReader(path)
             if reader.is_encrypted:

@@ -1,10 +1,13 @@
+# 打包产物
+dist/
+build/
+*.spec
+*.zip
+
+# Python 缓存
 __pycache__/
 *.pyc
 .pytest_cache/
 .ruff_cache/
-dist/
-build/
 *.egg-info/
-.venv/
-output/
 docs/

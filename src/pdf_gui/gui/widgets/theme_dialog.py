@@ -11,6 +11,7 @@ from ..theme import (
     THEME_TOKENS,
     apply_theme,
     color,
+    derive_hover,
     load_theme,
     save_theme,
 )
@@ -36,6 +37,7 @@ class ThemeDialog(ctk.CTkToplevel):
         super().__init__(master)
         self._on_applied = on_applied
         self.values = self._current_values()
+        self._dirty: set[str] = set()   # 用户实际改过的项，保存时只覆盖这些
         self.title(t("theme_title"))
         self.resizable(False, False)
         self.transient(master)
@@ -108,9 +110,17 @@ class ThemeDialog(ctk.CTkToplevel):
         current = self.values[token][mode]
         _rgb, hex_color = colorchooser.askcolor(
             color=current, parent=self, title=t("theme_pick"))
-        if hex_color:
-            self.values[token][mode] = hex_color
-            self._paint(token)
+        if not hex_color:
+            return
+        # 悬停色原本跟着主色走的话，改主色后继续跟；单独调过的悬停色保持不动
+        follows = (token == "accent"
+                   and self.values["accent_hover"] == derive_hover(self.values["accent"]))
+        self.values[token][mode] = hex_color
+        self._dirty.add(token)
+        if follows:
+            self.values["accent_hover"] = derive_hover(self.values["accent"])
+            self._paint("accent_hover")
+        self._paint(token)
 
     def _paint(self, token: str) -> None:
         for mode in (0, 1):
@@ -127,14 +137,20 @@ class ThemeDialog(ctk.CTkToplevel):
         for token, _ in THEME_TOKENS:
             value = DEFAULT_THEME[token]
             self.values[token] = [value, value] if isinstance(value, str) else list(value)
+            self._dirty.add(token)
         self._paint_all()
 
     def _save(self) -> None:
-        theme = {token: list(value) for token, value in self.values.items()}
+        # 以磁盘上的配置为底，只覆盖用户动过的项：没动的悬停色才能继续跟着主色推导
+        theme = load_theme(derive=False)
+        for token in self._dirty:
+            theme[token] = list(self.values[token])
+        if theme.get("accent_hover") == derive_hover(theme["accent"]):
+            theme.pop("accent_hover", None)     # 推导值不落盘，换主色时自动重新推导
         if not save_theme(theme):
             messagebox.showerror(t("theme_title"), t("theme_save_fail"), parent=self)
             return
-        apply_theme(theme)
+        apply_theme()   # 从文件重读（带推导），保证控件和配置文件一致
         self._close()
         if self._on_applied is not None:
             self._on_applied()

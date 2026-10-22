@@ -24,10 +24,13 @@
 | 加密解密 | AES-256 | 加密后的文件再次添加时可输密码临时解密，后续直接处理 |
 | 压缩 | 无损 / 光栅化 | 光栅化体积更小但文字变图片；输出 `xxx_min.pdf` 不覆盖源文件 |
 | 转图片 | PNG / JPG | DPI 与质量可调；每文件输出到 `{文件名}_{格式}/` 子目录 |
+| 图片转 PDF | 多图合成一份 | 按队列顺序排版；A4 / 原始尺寸、方向、页边距、质量可调，透明 PNG 自动铺白底 |
 
 通用规则：
 
 - **源文件永不修改**，所有输出写入你指定的输出目录
+- 文件或文件夹可**直接拖进窗口**，加入当前面板的队列（PDF 面板收 PDF，图片面板收图片）
+- 勾选运行条右侧「完成后打开输出目录」：批处理成功结束后自动弹出资源管理器
 - 同名输出三种处理：**自动重命名**（`xxx(1).pdf`）/ **覆盖** / **跳过**（报告计入跳过数）
 - 处理完成弹报告：✓ 成功 / ✗ 失败（含原因）/ ⊘ 跳过，底部有计数
 - 界面中英双语，一键切换；输出目录、各面板参数在重启后保留
@@ -44,6 +47,8 @@
 cd D:\20261016\pdf_gui
 pip install -e .
 ```
+
+不装成包、只想跑源码：`pip install -r requirements.txt`（锁定验证过的版本）；开发环境用 `pip install -r requirements-dev.txt` 或 `pip install -e ".[dev]"`。
 
 开发环境（含测试与打包工具）：
 
@@ -63,7 +68,7 @@ python -m pdf_gui
 
 ### 每个面板怎么用
 
-1. **添加文件**：点「添加文件」多选，或「添加文件夹」一次导入整目录；「上移/下移」调整顺序（影响合并顺序）
+1. **添加文件**：点「添加文件」多选、点「添加文件夹」导入整目录，或直接把文件/文件夹拖进窗口；「上移/下移」调整顺序（影响合并顺序）
 2. **选参数**：各面板参数见下文说明；盖章/骑缝章有实时预览
 3. **设输出目录**：点「选择」浏览；同名规则默认「自动重命名」
 4. **点「开始」**：进度条实时推进，可点「取消」终止剩余任务
@@ -89,11 +94,15 @@ python -m pdf_gui
 
 **转图片**——PNG 或 JPG、渲染 DPI（150≈屏显，300≈打印）、JPG 质量；输出到 `输出目录/文件名_png/`。
 
+**图片转 PDF**——把队列里的图片按顺序合成一份 PDF（PNG / JPG / BMP / WEBP / TIFF）：页面选 A4（可设方向、页边距）或原始尺寸；图片等比缩放居中，透明 PNG 自动铺白底，手机照片按 EXIF 方向自动摆正。
+
+**完成后打开输出目录**——运行条右下角勾选一次即可（设置会记住，重启仍生效）；批处理有成功产物时，结束后自动打开输出目录。结果报告里也有「打开输出目录」按钮。
+
 ### 设置文件
 
 | 文件 | 内容 |
 |---|---|
-| `~\.pdf_office_toolkit.json` | 语言 / 输出目录 / 同名规则 / 合并文件名 |
+| `~\.pdf_office_toolkit.json` | 语言 / 输出目录 / 同名规则 / 合并文件名 / 完成后打开输出目录 |
 | `~\.pdf_office_toolkit_theme.json` | 界面配色（首次运行自动生成） |
 
 两个文件都支持损坏后自动回退默认值，删除即重置。
@@ -101,6 +110,8 @@ python -m pdf_gui
 ### 自定义配色
 
 默认配色与当前界面一致（CustomTkinter 蓝色主题）。左下角点「配色」即可打开配色面板：逐项点色块选颜色，**保存后立即生效**，同时写入 `~\.pdf_office_toolkit_theme.json`。
+
+只改「主色」时，悬停色（按钮悬停、下拉框右侧箭头按钮，如「同名时」那个下拉）会按主色自动推一个更深的颜色跟着变；如果你单独调过「主色悬停」，则保持你选的颜色。
 
 也可以直接编辑这个文件（「关于」里有打开按钮），手改后需重启程序。颜色值可以写：
 
@@ -136,10 +147,14 @@ python -m pdf_gui
 #      dist\pdf-office-toolkit-windows-x64.zip（分发用压缩包）
 ```
 
+需要带安装向导的 `setup.exe`（安装进度、开始菜单、卸载项）时，用 `.\build_installer.ps1`，需要先装 Inno Setup 6。完整步骤、静默安装参数和公司电脑不放行 exe 时的 GitHub Actions 方案见 [docs/build-installer.md](docs/build-installer.md)。
+
+想要**单个 exe、不携带 `_internal` 目录**时，用 `.\build_onefile.ps1`（PyInstaller `--onefile`），产物 `dist\pdf-office-toolkit-onefile.exe`。代价是每次启动先解压到临时目录，冷启动慢 1～3 秒，杀软误报概率也略高；日常分发仍推荐 onedir + zip/安装包。
+
 ## 开发
 
 ```bash
-python -m pytest -q    # 102 个测试（core 引擎 + i18n/settings/workers/meta/theme）
+python -m pytest -q    # 128 个测试（core 引擎 + i18n/settings/theme/workers/meta/dnd）
 ruff check .           # lint
 ```
 
@@ -148,7 +163,7 @@ ruff check .           # lint
 ```
 src/pdf_gui/
 ├── core/        # PDF 引擎：纯函数、零 GUI 依赖，统一 TaskResult 返回
-├── gui/         # i18n / theme / settings / widgets / panels（8 个面板）
+├── gui/         # i18n / theme / settings / dnd / widgets / panels（9 个面板）
 ├── workers.py   # BatchWorker 后台线程与事件协议
 └── app.py       # 主窗口（面板缓存、导航、关于）
 tests/           # pytest + manual_checklist.md（GUI 手测清单）
@@ -157,13 +172,7 @@ docs/            # 公众号 / 博客 / 发布公告 / 骑缝章原理等分享�
 
 约定：core 改动必须带 pytest 用例；GUI 文案一律走 `gui/i18n.py` 双语字典；手测按 `tests/manual_checklist.md`。贡献流程见 [CONTRIBUTING.md](CONTRIBUTING.md)。
 
-## 分享与推广文章
 
-- [公众号推文](docs/wechat-article.md)
-- [技术博客](docs/blog-article.md)
-- [v0.1.0 发布公告](docs/release-notes-v0.1.0.md)
-- [骑缝章原理与实现](docs/paging-seal-implementation.md)
-- [文档索引](docs/README.md)
 
 ## 隐私说明
 
@@ -175,8 +184,8 @@ docs/            # 公众号 / 博客 / 发布公告 / 骑缝章原理等分享�
 
 [Apache-2.0](LICENSE)
 
-作者：魔都吴所谓 · 仓库：https://github.com/moduwusuowei/pdf-office-toolkit
+作者：魔都吴所谓 · 仓库：https://github.com/moduwusuowei/pdf_office_toolkit
 
 版本号 / 版权 / 仓库地址统一配置在 `src/pdf_gui/gui/app_meta.json`，主窗口「关于」中可见。
 
-依赖栈均为宽松许可：pypdf（BSD）、reportlab（BSD）、Pillow（MIT-CMU）、pypdfium2（Apache-2.0/BSD）、customtkinter（MIT）。
+依赖栈均为宽松许可：pypdf（BSD）、reportlab（BSD）、Pillow（MIT-CMU）、pypdfium2（Apache-2.0/BSD）、customtkinter（MIT）、tkinterdnd2（拖拽，Tcl 层 tkdnd，MIT）。

@@ -8,7 +8,7 @@ from pypdf import PdfReader, PdfWriter
 from reportlab.lib.utils import ImageReader
 
 from .overlay import append_with_overlay, make_overlay
-from .types import ProgressCB, TaskResult
+from .types import CancelCB, ProgressCB, TaskResult
 
 
 def strips_for_pages(pages: int, max_strips: int = 20) -> tuple[int, int]:
@@ -60,7 +60,8 @@ def assemble_strips(strips) -> Image.Image:
 
 def apply_paging_seal(src, dst, stamp_png, *, seal_height_ratio=0.4,
                       y_center_ratio=0.5, max_strips=20,
-                      progress_cb: ProgressCB | None = None) -> TaskResult:
+                      progress_cb: ProgressCB | None = None,
+                      cancel_cb: CancelCB | None = None) -> TaskResult:
     """骑缝章：印章裁透明边后横切 N 条，每页右边缘同一位置画对应条。"""
     src, dst = Path(src), Path(dst)
     try:
@@ -81,6 +82,8 @@ def apply_paging_seal(src, dst, stamp_png, *, seal_height_ratio=0.4,
 
     writer = PdfWriter()
     for i, page in enumerate(reader.pages):
+        if cancel_cb and cancel_cb():
+            return TaskResult(False, [], "已取消", cancelled=True)
         # 旋转页先把 /Rotate 烘焙进内容，否则"右边缘"会画到视觉上的底边
         try:
             rotation = int(page.get("/Rotate", 0) or 0) % 360

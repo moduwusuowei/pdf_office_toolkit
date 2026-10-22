@@ -2,6 +2,7 @@
 
 from .compress import compress_pdf
 from .convert import pdf_to_images
+from .images_to_pdf import SUPPORTED_SUFFIXES, images_to_pdf
 from .merge import merge_files
 from .pages import parse_page_spec
 from .paging_seal import (
@@ -14,7 +15,7 @@ from .paging_seal import (
 from .secure import decrypt_pdf, encrypt_pdf
 from .split import parse_ranges, split_by_blank_pages, split_by_ranges, split_every_n
 from .stamp import stamp_pdf
-from .types import ProgressCB, TaskResult
+from .types import CancelCB, ProgressCB, TaskResult
 from .watermark import add_image_watermark, add_text_watermark
 
 __all__ = [
@@ -28,5 +29,6 @@ __all__ = [
     "encrypt_pdf", "decrypt_pdf",
     "compress_pdf",
     "pdf_to_images",
-    "ProgressCB", "TaskResult",
+    "images_to_pdf", "SUPPORTED_SUFFIXES",
+    "CancelCB", "ProgressCB", "TaskResult",
 ]

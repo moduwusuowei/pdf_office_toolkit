@@ -24,10 +24,13 @@ A single window with multiple panels. Process a whole batch at once; work runs o
 | Encrypt / Decrypt | AES-256 | Open an encrypted PDF later and enter its password once per session |
 | Compress | Lossless / rasterize | Rasterize is smaller but turns text into images; outputs `xxx_min.pdf` |
 | To images | PNG / JPG | Adjustable DPI/quality; per-file subfolder `{name}_{fmt}/` |
+| Images to PDF | Combine images into one PDF | Pages follow the queue order; A4 / original size, orientation, margin, quality; transparent PNGs get a white background |
 
 General behavior:
 
 - **Source files are never modified**; all output goes to the folder you choose
+- **Drop files or folders straight onto the window** to fill the current panel's queue (PDF panels take PDFs, the image panel takes images)
+- Tick **Open output folder when done** on the run bar to pop Explorer open after a successful batch
 - On conflict: **auto-rename** (`xxx(1).pdf`) / **overwrite** / **skip** (counted in the report)
 - A report pops up at the end: ✓ done / ✗ failed (with reason) / ⊘ skipped
 - Chinese/English UI with one-click switching; output folder and panel parameters persist
@@ -44,6 +47,8 @@ General behavior:
 cd D:\20261016\pdf_gui
 pip install -e .
 ```
+
+Prefer not to install the package: `pip install -r requirements.txt` (tested versions pinned); for development use `pip install -r requirements-dev.txt` or `pip install -e ".[dev]"`.
 
 For development (tests and packaging):
 
@@ -63,7 +68,7 @@ Or use the installed command: `pdf-office-toolkit`. The window is 1150×720: pic
 
 ### Common workflow
 
-1. **Add files** with “Add Files” (multi-select) or “Add Folder”; reorder with Move Up/Down (affects merge order)
+1. **Add files** with “Add Files” (multi-select), “Add Folder”, or by dragging files/folders onto the window; reorder with Move Up/Down (affects merge order)
 2. **Set parameters** (see below); Stamp and Paging seal have live previews
 3. **Choose an output folder**; the default conflict rule is “Auto rename”
 4. **Click Start**; the progress bar advances, and Cancel stops the remaining jobs
@@ -89,11 +94,15 @@ Or use the installed command: `pdf-office-toolkit`. The window is 1150×720: pic
 
 **To images** — PNG/JPG, DPI (150 ≈ screen, 300 ≈ print), JPG quality; output to `output folder/{name}_png/`.
 
+**Images to PDF** — combine the queued images (PNG / JPG / BMP / WEBP / TIFF) into one PDF in queue order: A4 (orientation and margins configurable) or original size; images are scaled to fit and centered, transparent PNGs get a white background, and EXIF rotation is honored.
+
+**Open output folder when done** — tick it once on the run bar (the setting is remembered across restarts); after a batch with successful output, Explorer opens the output folder. The result report also has an “Open output folder” button.
+
 ### Settings files
 
 | File | Contents |
 |---|---|
-| `~\.pdf_office_toolkit.json` | Language / output folder / conflict rule / merge filename |
+| `~\.pdf_office_toolkit.json` | Language / output folder / conflict rule / merge filename / open output folder when done |
 | `~\.pdf_office_toolkit_theme.json` | UI colors (auto-created on first run) |
 
 Both fall back to defaults if corrupted; delete them to reset.
@@ -101,6 +110,8 @@ Both fall back to defaults if corrupted; delete them to reset.
 ### Custom colors
 
 Defaults match the current CustomTkinter blue theme. Click **Theme** at the bottom-left to open the color editor: pick a color per swatch and hit **Save & apply** — changes take effect immediately and are written to `~\.pdf_office_toolkit_theme.json`.
+
+Change only **Accent** and its hover shade (button hover, the dropdown arrow — e.g. the “On conflict” menu) is derived from it automatically; if you set **Accent hover** yourself, your color wins.
 
 You can also edit that file directly (the About dialog has a button to open it); hand edits need a restart. Color values can be:
 
@@ -136,10 +147,14 @@ Bundle the app with its runtime so it runs on machines without Python:
 # dist\pdf-office-toolkit-windows-x64.zip
 ```
 
+For a setup wizard (`setup.exe` with install progress, Start Menu entry, uninstaller), run `.\build_installer.ps1` — requires Inno Setup 6. Full steps, silent-install flags, and a GitHub Actions path for machines that block exe installers are in [docs/build-installer.md](docs/build-installer.md) (Chinese).
+
+If you want a **single exe with no `_internal` folder**, run `.\build_onefile.ps1` (PyInstaller `--onefile`); output is `dist\pdf-office-toolkit-onefile.exe`. It extracts to a temp folder on every launch, so cold start is 1–3 s slower and antivirus false positives are a bit more likely; onedir + zip/installer is still the recommended distribution.
+
 ## Development
 
 ```bash
-python -m pytest -q    # 102 tests (core engine + i18n/settings/workers/meta/theme)
+python -m pytest -q    # 128 tests (core engine + i18n/settings/theme/workers/meta/dnd)
 ruff check .           # lint
 ```
 
@@ -148,7 +163,7 @@ Layout:
 ```
 src/pdf_gui/
 ├── core/        # PDF engine: pure functions, no GUI dependencies, TaskResult
-├── gui/         # i18n / theme / settings / widgets / panels (8 panels)
+├── gui/         # i18n / theme / settings / dnd / widgets / panels (9 panels)
 ├── workers.py   # BatchWorker thread + event protocol
 └── app.py       # main window (panel cache, navigation, About)
 tests/           # pytest + manual_checklist.md for GUI smoke checks
@@ -175,8 +190,8 @@ Conventions: core changes need pytest coverage; all GUI text goes through the bi
 
 [Apache-2.0](LICENSE)
 
-Author: 魔都吴所谓 · Repository: https://github.com/moduwusuowei/pdf-office-toolkit
+Author: 魔都吴所谓 · Repository: https://github.com/moduwusuowei/pdf_office_toolkit
 
 Version, copyright, and repository URL are configured in `src/pdf_gui/gui/app_meta.json` and shown in the About dialog.
 
-Dependencies are all permissively licensed: pypdf (BSD), reportlab (BSD), Pillow (MIT-CMU), pypdfium2 (Apache-2.0/BSD), customtkinter (MIT).
+Dependencies are all permissively licensed: pypdf (BSD), reportlab (BSD), Pillow (MIT-CMU), pypdfium2 (Apache-2.0/BSD), customtkinter (MIT), tkinterdnd2 (drag & drop via the tkdnd Tcl extension, MIT).

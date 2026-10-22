@@ -3,13 +3,14 @@
 from pathlib import Path
 
 from .render import open_document, render_page
-from .types import ProgressCB, TaskResult
+from .types import CancelCB, ProgressCB, TaskResult
 
 _SUPPORTED_FMT = {"png": "PNG", "jpg": "JPEG", "jpeg": "JPEG"}
 
 
 def pdf_to_images(src, out_dir, dpi=150, fmt="png", quality=90,
-                  progress_cb: ProgressCB | None = None) -> TaskResult:
+                  progress_cb: ProgressCB | None = None,
+                  cancel_cb: CancelCB | None = None) -> TaskResult:
     src, out_dir = Path(src), Path(out_dir)
     fmt = fmt.lower().lstrip(".")
     if fmt not in _SUPPORTED_FMT:
@@ -28,6 +29,8 @@ def pdf_to_images(src, out_dir, dpi=150, fmt="png", quality=90,
     total = len(doc)
     outputs = []
     for i in range(total):
+        if cancel_cb and cancel_cb():
+            return TaskResult(False, outputs, "已取消", cancelled=True)
         img = render_page(doc, i, scale=scale)
         out = out_dir / f"{src.stem}_{i + 1:03d}.{fmt}"
         if _SUPPORTED_FMT[fmt] == "JPEG" and img.mode != "RGB":

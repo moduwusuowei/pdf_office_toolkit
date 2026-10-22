@@ -4,7 +4,7 @@ from pathlib import Path
 
 from pypdf import PdfReader, PdfWriter
 
-from .types import ProgressCB, TaskResult
+from .types import CancelCB, ProgressCB, TaskResult
 
 
 def parse_ranges(spec: str, total: int) -> list[range]:
@@ -46,7 +46,8 @@ def _check_readable(src: Path) -> None:
         raise _EncryptedError(src.name)
 
 
-def split_every_n(src, n: int, out_dir, progress_cb: ProgressCB | None = None) -> TaskResult:
+def split_every_n(src, n: int, out_dir, progress_cb: ProgressCB | None = None,
+                  cancel_cb: CancelCB | None = None) -> TaskResult:
     src, out_dir = Path(src), Path(out_dir)
     if n < 1:
         raise ValueError("每份页数必须 ≥ 1")
@@ -59,6 +60,8 @@ def split_every_n(src, n: int, out_dir, progress_cb: ProgressCB | None = None) -
     chunks = list(range(0, total, n))
     outputs = []
     for chunk_i, start in enumerate(chunks):
+        if cancel_cb and cancel_cb():
+            return TaskResult(False, outputs, "已取消", cancelled=True)
         out = out_dir / f"{src.stem}_{chunk_i + 1:02d}.pdf"
         outputs.append(_write_pages(src, out, range(start, min(start + n, total))))
         if progress_cb:
@@ -66,7 +69,8 @@ def split_every_n(src, n: int, out_dir, progress_cb: ProgressCB | None = None) -
     return TaskResult(True, outputs)
 
 
-def split_by_ranges(src, spec: str, out_dir, progress_cb: ProgressCB | None = None) -> TaskResult:
+def split_by_ranges(src, spec: str, out_dir, progress_cb: ProgressCB | None = None,
+                    cancel_cb: CancelCB | None = None) -> TaskResult:
     src, out_dir = Path(src), Path(out_dir)
     try:
         _check_readable(src)
@@ -80,6 +84,8 @@ def split_by_ranges(src, spec: str, out_dir, progress_cb: ProgressCB | None = No
     out_dir.mkdir(parents=True, exist_ok=True)
     outputs = []
     for i, r in enumerate(ranges):
+        if cancel_cb and cancel_cb():
+            return TaskResult(False, outputs, "已取消", cancelled=True)
         out = out_dir / f"{src.stem}_{i + 1:02d}.pdf"
         outputs.append(_write_pages(src, out, [p - 1 for p in r]))
         if progress_cb:
@@ -87,7 +93,8 @@ def split_by_ranges(src, spec: str, out_dir, progress_cb: ProgressCB | None = No
     return TaskResult(True, outputs)
 
 
-def split_by_blank_pages(src, out_dir, progress_cb: ProgressCB | None = None) -> TaskResult:
+def split_by_blank_pages(src, out_dir, progress_cb: ProgressCB | None = None,
+                         cancel_cb: CancelCB | None = None) -> TaskResult:
     from .render import open_document, page_is_blank, render_page
 
     src, out_dir = Path(src), Path(out_dir)
@@ -97,7 +104,12 @@ def split_by_blank_pages(src, out_dir, progress_cb: ProgressCB | None = None) ->
         return TaskResult(False, [], f"{e} 已加密，请先解密")
     doc = open_document(src)
     total = len(doc)
-    blank = {i for i in range(total) if page_is_blank(render_page(doc, i, scale=0.5))}
+    blank = set()
+    for i in range(total):
+        if cancel_cb and cancel_cb():
+            return TaskResult(False, [], "已取消", cancelled=True)
+        if page_is_blank(render_page(doc, i, scale=0.5)):
+            blank.add(i)
     segments: list[list[int]] = []
     current: list[int] = []
     for i in range(total):
@@ -114,6 +126,8 @@ def split_by_blank_pages(src, out_dir, progress_cb: ProgressCB | None = None) ->
     out_dir.mkdir(parents=True, exist_ok=True)
     outputs = []
     for seg_i, seg in enumerate(segments):
+        if cancel_cb and cancel_cb():
+            return TaskResult(False, outputs, "已取消", cancelled=True)
         out = out_dir / f"{src.stem}_{seg_i + 1:02d}.pdf"
         outputs.append(_write_pages(src, out, seg))
         if progress_cb:

@@ -4,10 +4,12 @@ import queue
 
 import customtkinter as ctk
 
+from .gui.dnd import enable_drop
 from .gui.i18n import get_lang, set_lang, t
 from .gui.meta import load_meta
 from .gui.panels.compress_panel import CompressPanel
 from .gui.panels.convert_panel import ConvertPanel
+from .gui.panels.images_to_pdf_panel import ImageToPdfPanel
 from .gui.panels.merge_panel import MergePanel
 from .gui.panels.paging_seal_panel import PagingSealPanel
 from .gui.panels.secure_panel import SecurePanel
@@ -15,6 +17,7 @@ from .gui.panels.split_panel import SplitPanel
 from .gui.panels.stamp_panel import StampPanel
 from .gui.panels.watermark_panel import WatermarkPanel
 from .gui.settings import save_settings
+from .gui.shell import open_folder
 from .gui.theme import color
 from .gui.widgets.about_dialog import AboutDialog
 from .gui.widgets.theme_dialog import ThemeDialog
@@ -22,7 +25,8 @@ from .workers import BatchWorker
 
 # 各面板任务逐个追加：import …；PANELS 依序加入
 PANELS: list[type] = [MergePanel, SplitPanel, WatermarkPanel, StampPanel,
-                      PagingSealPanel, SecurePanel, CompressPanel, ConvertPanel]
+                      PagingSealPanel, SecurePanel, CompressPanel, ConvertPanel,
+                      ImageToPdfPanel]
 
 
 class App(ctk.CTk):
@@ -48,6 +52,7 @@ class App(ctk.CTk):
             self.show_panel(PANELS[0])
         else:
             ctk.CTkLabel(self.container, text=t("wip")).grid(row=0, column=0)
+        self.drop_enabled = enable_drop(self, self._on_drop)
         self.protocol("WM_DELETE_WINDOW", self.on_close)
         self.after(100, self._poll)
 
@@ -87,6 +92,17 @@ class App(ctk.CTk):
         # 面板始终留在布局里，切换只是置顶：不重建、不重新布局，切换即点即到
         panel.tkraise()
         self.current_panel = panel
+        # 勾选状态存在全局 settings 里，切面板时同步一下（各面板的运行条是独立控件）
+        sync = getattr(panel.run_bar, "sync_settings", None)
+        if sync is not None:
+            sync()
+
+    # ---- 拖拽 ----
+    def _on_drop(self, paths: list[str]) -> None:
+        """拖入的文件/文件夹进当前面板队列；类型不符的由队列按 kind 过滤。"""
+        queue = getattr(self.current_panel, "file_queue", None)
+        if queue is not None:
+            queue.add_paths(paths)
 
     def switch_lang(self):
         set_lang("en" if get_lang() == "zh" else "zh")
@@ -162,6 +178,11 @@ class App(ctk.CTk):
                     rb.on_job_done(ev[1], ev[2], ev[3], ev[4])
                 elif ev[0] == "finish":
                     rb.on_finish(ev[1], ev[2], ev[3], ev[4])
+                    # 勾了「完成后打开输出目录」且有产物：把资源管理器叫出来
+                    if self.settings.get("auto_open_out") and ev[1] > 0:
+                        out_dir = getattr(rb, "last_out_dir", None)
+                        if out_dir is not None:
+                            open_folder(out_dir)
                     self.worker_panel = None
         except queue.Empty:
             pass

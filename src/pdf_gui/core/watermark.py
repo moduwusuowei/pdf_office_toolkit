@@ -10,7 +10,7 @@ from reportlab.pdfbase.cidfonts import UnicodeCIDFont
 
 from .overlay import append_with_overlay, make_overlay
 from .pages import parse_page_spec
-from .types import ProgressCB, TaskResult
+from .types import CancelCB, ProgressCB, TaskResult
 
 _font_registered = False
 
@@ -53,7 +53,9 @@ def _draw_text_overlay(page_w, page_h, text, *, opacity, angle, font_size, mode)
     return make_overlay(page_w, page_h, draw)
 
 
-def _apply(src, dst, overlay_for_page, pages, progress_cb: ProgressCB | None = None) -> TaskResult:
+def _apply(src, dst, overlay_for_page, pages,
+           progress_cb: ProgressCB | None = None,
+           cancel_cb: CancelCB | None = None) -> TaskResult:
     """通用套用流程：只对 pages 列表内的页叠 overlay。"""
     src, dst = Path(src), Path(dst)
     try:
@@ -66,6 +68,8 @@ def _apply(src, dst, overlay_for_page, pages, progress_cb: ProgressCB | None = N
     target_set = set(targets)
     writer = PdfWriter()
     for i, page in enumerate(reader.pages):
+        if cancel_cb and cancel_cb():
+            return TaskResult(False, [], "已取消", cancelled=True)
         if i in target_set:
             w, h = float(page.mediabox.width), float(page.mediabox.height)
             append_with_overlay(page, overlay_for_page(w, h), writer)
@@ -81,7 +85,8 @@ def _apply(src, dst, overlay_for_page, pages, progress_cb: ProgressCB | None = N
 
 def add_text_watermark(src, dst, text, *, opacity=0.15, angle=45, font_size=36,
                        mode="tile", pages="all",
-                       progress_cb: ProgressCB | None = None) -> TaskResult:
+                       progress_cb: ProgressCB | None = None,
+                       cancel_cb: CancelCB | None = None) -> TaskResult:
     if not text:
         return TaskResult(False, [], "水印文字为空")
 
@@ -89,7 +94,7 @@ def add_text_watermark(src, dst, text, *, opacity=0.15, angle=45, font_size=36,
         return _draw_text_overlay(w, h, text, opacity=opacity, angle=angle,
                                   font_size=font_size, mode=mode)
 
-    return _apply(src, dst, overlay_for_page, pages, progress_cb)
+    return _apply(src, dst, overlay_for_page, pages, progress_cb, cancel_cb)
 
 
 _X = {"left": 0.15, "center": 0.5, "right": 0.85}
@@ -120,7 +125,8 @@ def _scaled_alpha(img: Image.Image, opacity: float) -> Image.Image:
 
 def add_image_watermark(src, dst, image_path, *, opacity=0.3, size_ratio=0.3,
                         pos="center", pages="all",
-                        progress_cb: ProgressCB | None = None) -> TaskResult:
+                        progress_cb: ProgressCB | None = None,
+                        cancel_cb: CancelCB | None = None) -> TaskResult:
     try:
         x_ratio, y_ratio = _parse_pos(pos)
         img = _scaled_alpha(Image.open(image_path), opacity)
@@ -141,4 +147,4 @@ def add_image_watermark(src, dst, image_path, *, opacity=0.3, size_ratio=0.3,
 
         return make_overlay(w, h, draw)
 
-    return _apply(src, dst, overlay_for_page, pages, progress_cb)
+    return _apply(src, dst, overlay_for_page, pages, progress_cb, cancel_cb)

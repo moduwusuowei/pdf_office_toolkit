@@ -4,7 +4,7 @@ from pathlib import Path
 
 from pypdf import PdfReader, PdfWriter
 
-from .types import ProgressCB, TaskResult
+from .types import CancelCB, ProgressCB, TaskResult
 
 
 def _read_plain(src: Path):
@@ -15,7 +15,8 @@ def _read_plain(src: Path):
 
 
 def encrypt_pdf(src, dst, user_password, owner_password=None,
-                progress_cb: ProgressCB | None = None) -> TaskResult:
+                progress_cb: ProgressCB | None = None,
+                cancel_cb: CancelCB | None = None) -> TaskResult:
     src, dst = Path(src), Path(dst)
     if not user_password:
         return TaskResult(False, [], "密码为空")
@@ -27,6 +28,8 @@ def encrypt_pdf(src, dst, user_password, owner_password=None,
         return TaskResult(False, [], f"无法读取 {src.name}: {e}")
     writer = PdfWriter()
     for i, page in enumerate(reader.pages):
+        if cancel_cb and cancel_cb():
+            return TaskResult(False, [], "已取消", cancelled=True)
         writer.add_page(page)
         if progress_cb:
             progress_cb(i + 1, len(reader.pages), str(dst))
@@ -40,7 +43,8 @@ def encrypt_pdf(src, dst, user_password, owner_password=None,
 
 
 def decrypt_pdf(src, dst, password,
-                progress_cb: ProgressCB | None = None) -> TaskResult:
+                progress_cb: ProgressCB | None = None,
+                cancel_cb: CancelCB | None = None) -> TaskResult:
     src, dst = Path(src), Path(dst)
     try:
         reader = PdfReader(src)
@@ -52,6 +56,8 @@ def decrypt_pdf(src, dst, password,
         return TaskResult(False, [], f"{src.name} 密码错误或无法读取: {e}")
     writer = PdfWriter()
     for i, page in enumerate(reader.pages):
+        if cancel_cb and cancel_cb():
+            return TaskResult(False, [], "已取消", cancelled=True)
         writer.add_page(page)
         if progress_cb:
             progress_cb(i + 1, len(reader.pages), str(dst))

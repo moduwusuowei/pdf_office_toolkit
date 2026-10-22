@@ -97,3 +97,19 @@ def test_worker_cancel_skips_remaining():
     assert finish[0] == "finish"
     assert finish[1:4] == (1, 1, 1)
     assert finish[4] == [("b", "出错")]
+
+
+def test_worker_stops_when_core_reports_cancelled():
+    def cancels(**kw):
+        assert callable(kw["cancel_cb"])
+        return TaskResult(False, [], "已取消", cancelled=True)
+
+    def never(**kw):
+        raise AssertionError("任务已取消，不应继续执行")
+
+    q = queue.Queue()
+    BatchWorker([Job(cancels, label="a"), Job(never, label="b")], q).run()
+    events = _drain(q)
+    dones = [e for e in events if e[0] == "job_done"]
+    assert len(dones) == 1 and dones[0][3] == "cancelled"
+    assert events[-1][:4] == ("finish", 0, 0, 1)

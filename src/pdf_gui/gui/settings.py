@@ -10,6 +10,7 @@ DEFAULTS = {
     "out_dir": str(Path.home() / "Documents" / "PDF_Toolkit"),
     "conflict": "rename",  # rename | overwrite | skip
     "merge_name": "合并.pdf",
+    "auto_open_out": False,  # 批处理成功后自动打开输出目录
 }
 
 

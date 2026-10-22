@@ -28,6 +28,7 @@ dependencies = [
     "Pillow>=10.0",
     "pypdfium2>=4.0",
     "customtkinter>=5.2",
+    "tkinterdnd2>=0.6.4",  # 拖拽入队（Tcl 层 tkdnd）
 ]
 
 [project.urls]

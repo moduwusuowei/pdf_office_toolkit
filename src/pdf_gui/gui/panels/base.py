@@ -21,6 +21,7 @@ class PanelBase(ctk.CTkFrame):
     name = "base"
     title_key = "app_title"
     multi_file = True  # False = 单文件面板（FileQueue 添加新文件时替换）
+    file_kind = "pdf"  # FileQueue 接受的类型："pdf" 或 "image"
 
     def __init__(self, master, app):
         # 不透明底色：多个面板叠放在同一格，靠 tkraise 切换，避免每次重新布局
@@ -37,7 +38,7 @@ class PanelBase(ctk.CTkFrame):
         self.file_queue = FileQueue(
             self, max_files=0 if self.multi_file else 1,
             ask_password=app.ask_password, on_change=self.on_files_changed,
-            state=self.state)
+            state=self.state, kind=self.file_kind)
         self.file_queue.grid(row=1, column=0, sticky="ew", pady=(0, 8))
         # 行 2：参数区（滚动）
         self.params = ctk.CTkScrollableFrame(self, fg_color="transparent")
@@ -66,7 +67,9 @@ class PanelBase(ctk.CTkFrame):
         self.conflict_menu.set(self._conflict_labels[self.state["conflict"]])
         self.conflict_menu.grid(row=0, column=4, padx=(0, 8))
         self.run_bar = RunBar(bottom, on_start=self._start,
-                              on_cancel=app.cancel_worker)
+                              on_cancel=app.cancel_worker,
+                              settings=app.settings,
+                              out_dir_getter=self.current_out_dir)
         self.run_bar.grid(row=1, column=0, columnspan=5, sticky="ew", pady=(8, 0))
 
     # ---- 子类钩子 ----
@@ -84,6 +87,11 @@ class PanelBase(ctk.CTkFrame):
     @property
     def conflict_rule(self) -> str:
         return CONFLICT_RULES[self.state.get("conflict", 0)]
+
+    def current_out_dir(self) -> Path | None:
+        """输出目录输入框当前值；空串返回 None（报告里的「打开输出目录」用）。"""
+        text = self.out_entry.get().strip()
+        return Path(text) if text else None
 
     # ---- 启动 ----
     def _start(self) -> None:

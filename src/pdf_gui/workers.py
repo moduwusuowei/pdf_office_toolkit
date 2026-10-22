@@ -61,9 +61,15 @@ class BatchWorker(threading.Thread):
                 self.events.put(("job_progress", _i, done, total, msg))
 
             try:
-                result = job.func(progress_cb=progress, **job.kwargs)
+                result = job.func(progress_cb=progress,
+                                  cancel_cb=self.cancelled.is_set, **job.kwargs)
             except Exception as e:  # core 个别入口（如 split_every_n n<1）抛 ValueError
                 result = TaskResult(False, [], str(e))
+            if result.cancelled:
+                cancelled_count += 1
+                self.events.put(
+                    ("job_done", i, job.label, "cancelled", None, result.outputs))
+                break       # 用户已取消：不再开始后续任务
             if result.ok:
                 ok_count += 1
                 self.events.put(

@@ -17,7 +17,8 @@ DEFAULT_THEME = {
     "window_bg": ["gray92", "gray14"],
     "card_bg": ["gray86", "gray17"],
     "accent": ["#3B8ED0", "#1F6AA5"],
-    "accent_hover": ["#36719F", "#144870"],
+    # 与 _darken(accent) 保持一致：只改主色时悬停色按同一规则重新推导
+    "accent_hover": ["#2F71A6", "#185484"],
     "button_text": ["#DCE4EE", "#DCE4EE"],
     "text": ["gray10", "#DCE4EE"],
     "muted_text": ["gray", "gray"],
@@ -49,19 +50,47 @@ def _valid_color(value) -> bool:
     return False
 
 
-def load_theme(path: Path | str | None = None) -> dict:
-    """读取主题配置；缺失/损坏/非法项静默回退默认值。"""
+def _pair(value) -> list[str]:
+    """单色 → [浅色, 深色]；已经是两项的原样返回。"""
+    return [value, value] if isinstance(value, str) else [str(value[0]), str(value[1])]
+
+
+def _darken(value: str, factor: float = 0.8) -> str:
+    """#RRGGBB 按比例调暗；gray50 之类的命名色无法计算，原样返回。"""
+    if not (isinstance(value, str) and len(value) == 7 and value.startswith("#")):
+        return value
+    try:
+        r, g, b = (int(value[i:i + 2], 16) for i in (1, 3, 5))
+    except ValueError:
+        return value
+    return "#%02X%02X%02X" % (int(r * factor), int(g * factor), int(b * factor))
+
+
+def derive_hover(accent: str | list[str]) -> list[str]:
+    """由主色推出悬停色：只改主色时，按钮悬停、下拉箭头等跟着一起变。"""
+    return [_darken(c) for c in _pair(accent)]
+
+
+def load_theme(path: Path | str | None = None, *, derive: bool = True) -> dict:
+    """读取主题配置；缺失/损坏/非法项静默回退默认值。
+
+    derive=True 时，文件里只写了 accent 没写 accent_hover 的，悬停色按主色推导，
+    避免改了主色、下拉箭头/按钮悬停还是默认蓝。
+    """
     path = Path(path) if path is not None else THEME_PATH
     theme = {k: v for k, v in DEFAULT_THEME.items() if not k.startswith("_")}
+    explicit: set[str] = set()
     try:
         loaded = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, ValueError):
-        return theme
-    if not isinstance(loaded, dict):
-        return theme
-    for key, value in loaded.items():
-        if key in theme and _valid_color(value):
-            theme[key] = value
+        loaded = None
+    if isinstance(loaded, dict):
+        for key, value in loaded.items():
+            if key in theme and _valid_color(value):
+                theme[key] = value
+                explicit.add(key)
+    if derive and "accent" in explicit and "accent_hover" not in explicit:
+        theme["accent_hover"] = derive_hover(theme["accent"])
     return theme
 
 

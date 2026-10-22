@@ -89,3 +89,53 @@ def test_apply_theme_reaches_extended_widgets(tmp_path):
     assert table["CTkEntry"]["border_color"] == ["#CCCCCC", "#333333"]
     assert table["CTkEntry"]["fg_color"] != ["#AA0000", "#BB0000"]
 
+
+
+# ---- 悬停色跟随主色（同名时下拉按钮、按钮悬停等都用它） ----
+def test_default_hover_matches_derived_default():
+    from pdf_gui.gui.theme import derive_hover
+    assert DEFAULT_THEME["accent_hover"] == derive_hover(DEFAULT_THEME["accent"])
+
+
+def test_accent_only_derives_hover(tmp_path):
+    from pdf_gui.gui.theme import derive_hover
+    path = tmp_path / "theme.json"
+    path.write_text(json.dumps({"accent": ["#D93025", "#B3261E"]}), encoding="utf-8")
+    theme = load_theme(path)
+    assert theme["accent"] == ["#D93025", "#B3261E"]
+    assert theme["accent_hover"] == derive_hover(["#D93025", "#B3261E"])
+    assert theme["accent_hover"] != DEFAULT_THEME["accent_hover"]
+
+
+def test_explicit_hover_wins(tmp_path):
+    path = tmp_path / "theme.json"
+    path.write_text(json.dumps({
+        "accent": "#D93025",
+        "accent_hover": ["#111111", "#222222"],
+    }), encoding="utf-8")
+    assert load_theme(path)["accent_hover"] == ["#111111", "#222222"]
+
+
+def test_derive_off_keeps_stored_hover(tmp_path):
+    path = tmp_path / "theme.json"
+    path.write_text(json.dumps({"accent": "#D93025"}), encoding="utf-8")
+    assert load_theme(path, derive=False)["accent_hover"] == DEFAULT_THEME["accent_hover"]
+
+
+def test_darken_leaves_named_colors_alone():
+    from pdf_gui.gui.theme import _darken
+    assert _darken("gray50") == "gray50"
+    assert _darken("#3B8ED0") == "#2F71A6"
+
+
+def test_apply_theme_follows_accent_to_option_menu(tmp_path):
+    from pdf_gui.gui.theme import derive_hover
+    path = tmp_path / "theme.json"
+    path.write_text(json.dumps({"accent": ["#AA0000", "#BB0000"]}), encoding="utf-8")
+    ctk.set_default_color_theme("blue")
+    apply_theme(load_theme(path))
+    row = ctk.ThemeManager.theme["CTkOptionMenu"]
+    # 「同名时」下拉框本体跟主色，箭头按钮跟悬停色——两者都必须变
+    assert row["fg_color"] == ["#AA0000", "#BB0000"]
+    assert row["button_color"] == derive_hover(["#AA0000", "#BB0000"])
+    assert row["button_color"] != DEFAULT_THEME["accent_hover"]

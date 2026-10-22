@@ -5,13 +5,14 @@ from PIL import Image
 from reportlab.lib.utils import ImageReader
 
 from .overlay import make_overlay
-from .types import ProgressCB, TaskResult
+from .types import CancelCB, ProgressCB, TaskResult
 from .watermark import _apply, _scaled_alpha
 
 
 def stamp_pdf(src, dst, stamp_png, *, pages="all", x_ratio=0.8, y_ratio=0.15,
               size_ratio=0.25, opacity=1.0,
-              progress_cb: ProgressCB | None = None) -> TaskResult:
+              progress_cb: ProgressCB | None = None,
+              cancel_cb: CancelCB | None = None) -> TaskResult:
     """stamp 以 (x_ratio, y_ratio) 为中心、宽 size_ratio*页宽 叠加。"""
     try:
         img = _scaled_alpha(Image.open(stamp_png).convert("RGBA"), opacity)
@@ -30,4 +31,4 @@ def stamp_pdf(src, dst, stamp_png, *, pages="all", x_ratio=0.8, y_ratio=0.15,
 
         return make_overlay(w, h, draw)
 
-    return _apply(src, dst, overlay_for_page, pages, progress_cb)
+    return _apply(src, dst, overlay_for_page, pages, progress_cb, cancel_cb)

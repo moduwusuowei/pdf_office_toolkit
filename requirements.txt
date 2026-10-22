@@ -1,11 +1,13 @@
-# 运行时依赖（与 pyproject.toml [project.dependencies] 保持一致）
-pypdf[crypto]>=4.0
-reportlab>=4.0
-Pillow>=10.0
-pypdfium2>=4.0
-customtkinter>=5.2
+﻿# PDF 办公百宝箱 · 运行时依赖
+# 版本取当前验证通过的组合（Python 3.12 + Windows 10/11）；
+# pyproject.toml 里写的是下限，这里锁死便于复现构建，升级时两边同步。
+#
+# 用法：pip install -r requirements.txt
+# 若已安装本项目（pip install -e .），无需再跑本文件。
 
-# 开发/构建依赖（与 pyproject.toml [project.optional-dependencies].dev 保持一致）
-pytest>=8.0
-ruff>=0.4
-pyinstaller>=6.0
+pypdf[crypto]==6.16.2   # PDF 读写 + AES 加密（crypto 附带 cryptography）
+reportlab==4.4.10       # 生成 PDF（水印/盖章/图片转 PDF）
+Pillow==12.2.0          # 图片处理（印章、预览、图片转 PDF）
+pypdfium2==5.8.0        # 页面渲染（预览、光栅化压缩、转图片）
+customtkinter==6.0.0    # GUI 框架
+tkinterdnd2==0.6.4   # 拖拽入队（Tcl 层 tkdnd，避免 ctypes 回调碰 GIL）
